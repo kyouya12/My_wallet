@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'providers/transaction_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/category_provider.dart';
+import 'package:flutter/services.dart';
 
 class AddTransactionBottomSheet extends StatefulWidget {
   const AddTransactionBottomSheet({super.key});
@@ -11,7 +17,16 @@ class AddTransactionBottomSheet extends StatefulWidget {
 class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
   bool isPemasukan = false;
   String selectedCategory = 'Edukasi';
-  String amount = '0';
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, dynamic>> categories = [
     {'name': 'Makanan', 'icon': Icons.restaurant, 'color': const Color(0xFF6EE7B7), 'iconColor': const Color(0xFF047857)},
@@ -183,12 +198,26 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      amount,
-                      style: GoogleFonts.inter(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                    IntrinsicWidth(
+                      child: TextField(
+                        controller: _amountController,
+                        autofocus: true,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          NumberTextInputFormatter(),
+                        ],
+                        style: GoogleFonts.inter(
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          hintText: '0',
+                        ),
                       ),
                     ),
                   ],
@@ -256,49 +285,64 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                 const SizedBox(height: 32),
 
                 // Tanggal Field
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today_outlined, color: Colors.black54, size: 24),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'TANGGAL',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade500,
-                                letterSpacing: 1.0,
+                GestureDetector(
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2101),
+                    );
+                    if (picked != null && picked != _selectedDate) {
+                      setState(() {
+                        _selectedDate = picked;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today_outlined, color: Colors.black54, size: 24),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'TANGGAL',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade500,
+                                  letterSpacing: 1.0,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Hari ini, 24 Okt 2023',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('dd MMM yyyy').format(_selectedDate),
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
                 // Catatan Field
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
@@ -308,28 +352,30 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                       const Icon(Icons.notes_outlined, color: Colors.black54, size: 24),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'CATATAN',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade500,
-                                letterSpacing: 1.0,
-                              ),
+                        child: TextField(
+                          controller: _notesController,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            labelText: 'CATATAN',
+                            labelStyle: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade500,
+                              letterSpacing: 1.0,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tambahkan deskripsi...',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade500,
-                              ),
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            hintText: 'Tambahkan deskripsi...',
+                            hintStyle: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade500,
                             ),
-                          ],
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
                     ],
@@ -358,7 +404,33 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
                   ),
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context);
+                      final amountText = _amountController.text.replaceAll('.', '');
+                      final amountVal = double.tryParse(amountText) ?? 0;
+                      if (amountVal <= 0) return;
+
+                      final userId = context.read<UserProvider>().userId;
+                      if (userId != null) {
+                        // Find category ID
+                        final catProvider = context.read<CategoryProvider>();
+                        final catList = isPemasukan ? catProvider.incomeCategories : catProvider.expenseCategories;
+                        
+                        // Default to 1 (Makanan) or 9 (Gaji) if not found
+                        int catId = isPemasukan ? 9 : 1; 
+                        try {
+                          catId = catList.firstWhere((c) => c.namaKategori == selectedCategory).kategoriId!;
+                        } catch (_) {}
+
+                        context.read<TransactionProvider>().addTransaction(
+                          userId: userId,
+                          tipeTrx: isPemasukan ? 'income' : 'expense',
+                          kategoriId: catId,
+                          nominal: amountVal,
+                          tanggalTrx: _selectedDate,
+                          catatan: _notesController.text,
+                        ).then((_) {
+                          Navigator.pop(context);
+                        });
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.transparent,
@@ -383,6 +455,34 @@ class _AddTransactionBottomSheetState extends State<AddTransactionBottomSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class NumberTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final int selectionIndexFromRight = newValue.text.length - newValue.selection.end;
+    
+    // Remove all non-digits
+    String text = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (text.isEmpty) return newValue.copyWith(text: '');
+    
+    final int value = int.parse(text);
+    final String newText = NumberFormat.currency(locale: 'id', symbol: '', decimalDigits: 0).format(value);
+
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+        offset: newText.length - selectionIndexFromRight,
       ),
     );
   }

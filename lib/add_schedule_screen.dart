@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'providers/schedule_provider.dart';
+import 'providers/user_provider.dart';
 
 class AddScheduleScreen extends StatefulWidget {
   const AddScheduleScreen({super.key});
@@ -10,6 +14,19 @@ class AddScheduleScreen extends StatefulWidget {
 
 class _AddScheduleScreenState extends State<AddScheduleScreen> {
   bool _isReminderOn = true;
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+  String _selectedCategory = 'Tagihan';
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _titleController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,13 +93,23 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  '1.500.000',
-                  style: GoogleFonts.inter(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
-                    letterSpacing: -1.0,
+                IntrinsicWidth(
+                  child: TextField(
+                    controller: _amountController,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    style: GoogleFonts.inter(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
+                      letterSpacing: -1.0,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: '0',
+                    ),
                   ),
                 ),
               ],
@@ -110,13 +137,15 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                   _buildFormLabel('NAMA JADWAL'),
                   _buildInputField(
                     icon: Icons.insert_drive_file_outlined,
-                    initialValue: 'Bayar Listrik',
+                    controller: _titleController,
+                    hint: 'Misal: Bayar Listrik',
                   ),
                   const SizedBox(height: 20),
 
                   _buildFormLabel('DESKRIPSI (OPSIONAL)'),
                   _buildInputField(
                     icon: Icons.notes_outlined,
+                    controller: _notesController,
                     hint: 'Tambahkan catatan...',
                   ),
                   const SizedBox(height: 20),
@@ -130,17 +159,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildCategoryChip(Icons.home_outlined, 'Rumah', false),
-                      _buildCategoryChip(
-                        Icons.receipt_long_outlined,
-                        'Tagihan',
-                        true,
-                      ),
-                      _buildCategoryChip(
-                        Icons.credit_card_outlined,
-                        'Cicilan',
-                        false,
-                      ),
+                      _buildCategoryChip(Icons.home_outlined, 'Rumah'),
+                      _buildCategoryChip(Icons.receipt_long_outlined, 'Tagihan'),
+                      _buildCategoryChip(Icons.credit_card_outlined, 'Cicilan'),
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
@@ -235,7 +256,23 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                 ),
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context);
+                    final amountVal = double.tryParse(_amountController.text) ?? 0;
+                    final title = _titleController.text.trim();
+                    if (amountVal <= 0 || title.isEmpty) return;
+
+                    final userId = context.read<UserProvider>().userId;
+                    if (userId != null) {
+                      context.read<ScheduleProvider>().addSchedule(
+                        userId: userId,
+                        namaTagihan: title,
+                        kategoriId: 1, // Just dummy for now
+                        tanggalJatuhTempo: _selectedDate,
+                        isReminderActive: _isReminderOn,
+                        nominal: amountVal,
+                      ).then((_) {
+                        Navigator.pop(context);
+                      });
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
@@ -280,7 +317,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
 
   Widget _buildInputField({
     required IconData icon,
-    String? initialValue,
+    TextEditingController? controller,
     String? hint,
   }) {
     return Container(
@@ -289,7 +326,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: TextFormField(
-        initialValue: initialValue,
+        controller: controller,
         decoration: InputDecoration(
           prefixIcon: Icon(icon, color: Colors.black54, size: 20),
           hintText: hint,
@@ -310,63 +347,82 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   }
 
   Widget _buildDatePickerField() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.calendar_today_outlined,
-            color: Colors.black54,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Setiap tanggal 20',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
+    return GestureDetector(
+      onTap: () async {
+        final DateTime? picked = await showDatePicker(
+          context: context,
+          initialDate: _selectedDate,
+          firstDate: DateTime(2000),
+          lastDate: DateTime(2101),
+        );
+        if (picked != null && picked != _selectedDate) {
+          setState(() {
+            _selectedDate = picked;
+          });
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calendar_today_outlined,
+              color: Colors.black54,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                DateFormat('dd MMM yyyy').format(_selectedDate),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
               ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.black26, size: 20),
-        ],
+            const Icon(Icons.chevron_right, color: Colors.black26, size: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCategoryChip(IconData icon, String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFFE0E7FF)
-            : const Color(0xFFF3F4F6), // light blue vs light gray
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? const Color(0xFF3366FF) : Colors.black54,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? const Color(0xFF3366FF) : Colors.black87,
+  Widget _buildCategoryChip(IconData icon, String label) {
+    final isSelected = _selectedCategory == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFE0E7FF)
+              : const Color(0xFFF3F4F6), // light blue vs light gray
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? const Color(0xFF3366FF) : Colors.black54,
             ),
-          ),
-        ],
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF3366FF) : Colors.black87,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
